@@ -9,13 +9,7 @@ const IDEA_BANK = [
       "Kneel unmoving at the center of the room for 20 minutes straight.", 
       "Maintain a strict upright kneeling profile with hands behind back until dismissed.", 
       "Log 15 minutes of posture endurance tracking while focusing on absolute stillness.",
-      "Kneel quietly at the edge of the room for 30 minutes reflecting on your duties.",
-      "Execute an extended postural duty block during her evening relaxation hours.",
-      "Maintain a full kneeling profile flat on the floor for 45 consecutive minutes.",
-      "Assume a submissive kneeling stance immediately upon her entering the space.",
-      "Kneel upright with eyes cast downward, maintaining complete stillness until authorized.",
-      "Execute a 30-minute posture endurance run with arms extended horizontally.",
-      "Maintain rigid postural compliance while executing assigned domestic routines."
+      "Kneel quietly at the edge of the room for 30 minutes reflecting on your duties."
     ] 
   },
   { 
@@ -23,30 +17,7 @@ const IDEA_BANK = [
     tasks: [
       "Secure the gag tightly and log a 20-minute session of silent submission.", 
       "Complete 30 minutes of gag tolerance training while working on household chores.", 
-      "Maintain strict verbal lockout until she explicitly authorizes you to speak.",
-      "Log a 45-minute restriction run keeping a complete record of your mental state.",
-      "Endure an evening under sensory or verbal restriction as dictated by the realm.",
-      "Secure the gag for 40 consecutive minutes while processing administrative data."
-    ] 
-  },
-  { 
-    cat: "III. Chastity & Long-Term Denial Matrix", 
-    tasks: [
-      "Lock down immediately and log a fresh 48-hour denial extension.", 
-      "Submit a formal verification report documenting your consecutive days denied.", 
-      "Acknowledge her absolute, unmitigated control over your physical release timeline.",
-      "Surrender all personal boundary controls for the entirety of the weekend.",
-      "Log a strict hands-off check-in precisely every 12 hours without exception."
-    ] 
-  },
-  { 
-    cat: "IV. Domestic Service & Obedience Training", 
-    tasks: [
-      "Complete 30 minutes of domestic chores while maintaining a restricted posture.", 
-      "Write out 50 lines reinforcing your absolute dedication to her realm.",
-      "Prepare a refreshment or task fulfillment exactly to her specifications.",
-      "Log a service execution report highlighting tasks completed under her name.",
-      "Acknowledge your role as her obedient assistant with a formal validation entry."
+      "Maintain strict verbal lockout until she explicitly authorizes you to speak."
     ] 
   }
 ];
@@ -63,15 +34,20 @@ export default function App() {
   const [milestoneType, setMilestoneType] = useState('Subject Orgasm')
   const [milestoneNotes, setMilestoneNotes] = useState('')
   
-  // State for her free-form text entry box
   const [customText, setCustomText] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     if (user) {
       fetchData()
+      
+      // Real-time synchronization stream: listens for changes and pushes instantly
       const channel = supabase.channel('cindy-master-stream')
-        .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'decrees' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'cindy_training_history' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'cindy_milestones' }, () => fetchData())
         .subscribe()
+        
       return () => supabase.removeChannel(channel)
     }
   }, [user])
@@ -85,9 +61,8 @@ export default function App() {
     if (mile) setMilestones(mile)
   }
 
-  async function handleAddInstruction(text) {
-    if (!text.trim()) return
-    await supabase.from('decrees').insert([{ content: text.trim() }])
+  async function handleAddInstruction(text, url = null) {
+    await supabase.from('decrees').insert([{ content: text.trim(), media_url: url }])
   }
 
   async function handleCustomSubmit(e) {
@@ -95,7 +70,35 @@ export default function App() {
     if (!customText.trim()) return
     await handleAddInstruction(customText)
     setCustomText('')
-    alert('Custom command broadcasted!')
+  }
+
+  // Image upload pipeline to bucket storage
+  async function handleImageUpload(e) {
+    try {
+      setUploading(true)
+      if (!e.target.files || e.target.files.length === 0) return
+      const file = e.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('realm-media')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage
+        .from('realm-media')
+        .getPublicUrl(filePath)
+
+      await handleAddInstruction(user.role === 'goddess' ? "Sent an image dispatch." : "Submitted a visual verification report.", data.publicUrl)
+      alert('Photo synced to ledger stream successfully!')
+    } catch (error) {
+      alert('Media sync issue: ' + error.message)
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function handleLogTraining(e) {
@@ -119,17 +122,25 @@ export default function App() {
   return (
     <div style={{ padding: '20px', fontFamily: 'monospace', backgroundColor: '#0d0614', color: '#ded3f0', minHeight: '100vh' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #d4af37', paddingBottom: '15px', marginBottom: '20px' }}>
-        <h1 style={{ color: '#d4af37', margin: 0, fontSize: '1.8rem' }}>
-          {user.role === 'goddess' ? '👑 QUEENSPACE CONTROL // GODDESS CINDY' : '🛡️ DATA COLLECTION HUB // SUBJECT TERMINAL'}
+        <h1 style={{ color: '#d4af37', margin: 0, fontSize: '1.4rem' }}>
+          {user.role === 'goddess' ? '👑 QUEENSPACE CONTROL // CINDY' : '🛡️ DATA COLLECTION // TERMINAL'}
         </h1>
-        <button onClick={() => setUser(null)} style={{ backgroundColor: '#a63a50', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'monospace' }}>Disconnect</button>
+        <button onClick={() => setUser(null)} style={{ backgroundColor: '#a63a50', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Disconnect</button>
       </header>
 
-      {/* SUBJECT PORTAL */}
+      {/* SUBJECT INTERFACE */}
       {user.role === 'subject' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
           <div>
             <h2 style={{ color: '#ad82f7', borderBottom: '1px solid #361954', paddingBottom: '5px' }}>⚡ Ingestion Node</h2>
+            
+            {/* Visual Task Submission Form */}
+            <div style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', border: '1px solid #42256b', marginBottom: '20px' }}>
+              <h3 style={{ marginTop: 0, color: '#fff' }}>📸 Sync Verification Photo</h3>
+              <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} style={{ color: '#fff' }} />
+              {uploading && <p style={{ color: '#d4af37', margin: '5px 0 0 0' }}>Streaming attachment to vault...</p>}
+            </div>
+
             <form onSubmit={handleLogTraining} style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #2d1a42' }}>
               <h3 style={{ marginTop: 0, color: '#fff' }}>Log Training Metrics</h3>
               <select value={activityType} onChange={(e) => setActivityType(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px' }}>
@@ -138,8 +149,8 @@ export default function App() {
                 <option value="Postural Duty">Strict Postural Duty</option>
               </select>
               <input type="number" required placeholder="Duration (Minutes)" value={duration} onChange={(e) => setDuration(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px', boxSizing: 'border-box' }} />
-              <textarea placeholder="Log response metrics, state of focus, or feedback..." value={logNotes} onChange={(e) => setLogNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px', boxSizing: 'border-box' }} />
-              <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#7442c2', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Commit Stats to Ledger</button>
+              <textarea placeholder="Log response metrics, state of focus..." value={logNotes} onChange={(e) => setLogNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px', boxSizing: 'border-box' }} />
+              <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#7442c2', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Commit Stats to Ledger</button>
             </form>
 
             <form onSubmit={handleLogMilestone} style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', border: '1px solid #2d1a42' }}>
@@ -148,60 +159,60 @@ export default function App() {
                 <option value="Subject Orgasm">Orgasm Tracker (Last Reset)</option>
                 <option value="Denial Cycle Update">Denial Cycle Tracking Note</option>
               </select>
-              <textarea required placeholder="Input dates, restriction lengths, or timeline details..." value={milestoneNotes} onChange={(e) => setMilestoneNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px', boxSizing: 'border-box' }} />
-              <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#e2a468', color: '#11091c', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Transmit Metric Update</button>
+              <textarea required placeholder="Input dates, restriction lengths..." value={milestoneNotes} onChange={(e) => setMilestoneNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', backgroundColor: '#11091c', color: '#fff', border: '1px solid #56338c', marginBottom: '15px', boxSizing: 'border-box' }} />
+              <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#e2a468', color: '#11091c', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Transmit Metric Update</button>
             </form>
           </div>
 
           <div>
-            <h2 style={{ color: '#d4af37', borderBottom: '1px solid #361954', paddingBottom: '5px' }}>📜 Running Assignment Feed (Newest Top)</h2>
-            <div style={{ backgroundColor: '#11091c', border: '1px solid #361954', padding: '20px', borderRadius: '8px', maxHeight: '680px', overflowY: 'auto' }}>
-              {instructions.length === 0 ? <p style={{ color: '#666' }}>No directives found in the rolling vault.</p> : 
-                instructions.map((i, index) => (
-                  <div key={i.id} style={{ borderBottom: '1px solid #28153d', padding: '12px 0', opacity: index === 0 ? 1 : 0.6 }}>
-                    {index === 0 && <span style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>🔥 ACTIVE MANDATE:</span>}
-                    <span style={{ color: index === 0 ? '#fff' : '#b5a6cc', fontSize: index === 0 ? '1.2rem' : '1rem', fontWeight: index === 0 ? 'bold' : 'normal' }}>
-                      "{i.content}"
-                    </span>
-                    <br/><small style={{ color: '#8870a6' }}>Logged at {new Date(i.issued_at).toLocaleDateString()} {new Date(i.issued_at).toLocaleTimeString()}</small>
-                  </div>
-                ))
-              }
+            <h2 style={{ color: '#d4af37', borderBottom: '1px solid #361954', paddingBottom: '5px' }}>📜 Running Assignment Feed</h2>
+            <div style={{ backgroundColor: '#11091c', border: '1px solid #361954', padding: '20px', borderRadius: '8px', maxHeight: '720px', overflowY: 'auto' }}>
+              {instructions.map((i, index) => (
+                <div key={i.id} style={{ borderBottom: '1px solid #28153d', padding: '12px 0', opacity: index === 0 ? 1 : 0.6 }}>
+                  {index === 0 && <span style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>🔥 ACTIVE MANDATE:</span>}
+                  <span style={{ color: index === 0 ? '#fff' : '#b5a6cc', fontSize: index === 0 ? '1.1rem' : '1rem' }}>
+                    "{i.content}"
+                  </span>
+                  {i.media_url && (
+                    <img src={i.media_url} alt="Vault Content" style={{ display: 'block', maxWidth: '100%', maxHeight: '250px', borderRadius: '6px', marginTop: '10px', border: '1px solid #56338c' }} />
+                  )}
+                  <br/><small style={{ color: '#8870a6' }}>Logged: {new Date(i.issued_at).toLocaleDateString()} {new Date(i.issued_at).toLocaleTimeString()}</small>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* GODDESS PORTAL */}
+      {/* GODDESS CINDY PORTAL */}
       {user.role === 'goddess' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '30px' }}>
           <div>
-            {/* RESTORED: Custom Directive Entry Box */}
             <div style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', border: '1px solid #d4af37', marginBottom: '20px' }}>
-              <h2 style={{ color: '#d4af37', marginTop: 0, fontSize: '1.3rem' }}>✍️ Issue Custom Directive</h2>
+              <h2 style={{ color: '#d4af37', marginTop: 0, fontSize: '1.2rem' }}>✍️ Issue Custom Directive</h2>
               <form onSubmit={handleCustomSubmit}>
                 <textarea 
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="Type an original order, chore, or dynamic rule here..."
-                  style={{ width: '100%', height: '70px', padding: '10px', backgroundColor: '#0d0614', color: '#fff', border: '1px solid #56338c', borderRadius: '4px', boxSizing: 'border-box', marginBottom: '10px', fontFamily: 'monospace' }}
+                  placeholder="Type an original order, chore, or dynamic rule..."
+                  style={{ width: '100%', height: '60px', padding: '10px', backgroundColor: '#0d0614', color: '#fff', border: '1px solid #56338c', marginBottom: '10px', boxSizing: 'border-box' }}
                 />
-                <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#d4af37', color: '#0d0614', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'monospace' }}>
-                  ⚡ Broadcast Custom Order
-                </button>
+                <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#d4af37', color: '#0d0714', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Broadcast Order</button>
               </form>
+              
+              <div style={{ marginTop: '15px', borderTop: '1px dashed #56338c', paddingTop: '15px' }}>
+                <h4 style={{ color: '#fff', margin: '0 0 5px 0' }}>📸 Broadcast Photo Instruction:</h4>
+                <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} style={{ color: '#fff' }} />
+              </div>
             </div>
 
-            <h2 style={{ color: '#d4af37', borderBottom: '1px solid #361954', paddingBottom: '5px', marginTop: 0 }}>💡 Quick Command Deck</h2>
-            <div style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', border: '1px solid #2d1a42', height: '400px', overflowY: 'auto' }}>
+            <h2 style={{ color: '#d4af37', borderBottom: '1px solid #361954', paddingBottom: '5px' }}>💡 Quick Command Deck</h2>
+            <div style={{ backgroundColor: '#190f26', padding: '20px', borderRadius: '8px', border: '1px solid #2d1a42', height: '350px', overflowY: 'auto' }}>
               {IDEA_BANK.map((section, idx) => (
                 <div key={idx} style={{ marginBottom: '25px' }}>
                   <h3 style={{ color: '#d4af37', borderBottom: '1px solid #56338c', paddingBottom: '6px', marginTop: 0 }}>{section.cat}</h3>
                   {section.tasks.map((task, tIdx) => (
-                    <button key={tIdx} onClick={() => {
-                      handleAddInstruction(task)
-                      alert('Command broadcasted!')
-                    }} style={{ display: 'block', width: '100%', textAlign: 'left', backgroundColor: '#11091c', border: '1px solid #56338c', color: '#e5dcf5', padding: '12px', marginBottom: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    <button key={tIdx} onClick={() => handleAddInstruction(task)} style={{ display: 'block', width: '100%', textAlign: 'left', backgroundColor: '#11091c', border: '1px solid #56338c', color: '#e5dcf5', padding: '12px', marginBottom: '8px', borderRadius: '4px', cursor: 'pointer' }}>
                       ⚡ {task}
                     </button>
                   ))}
@@ -212,28 +223,24 @@ export default function App() {
 
           <div>
             <h2 style={{ color: '#ad82f7', borderBottom: '1px solid #361954', paddingBottom: '5px' }}>📜 Live Vault Auditing</h2>
-            <div style={{ backgroundColor: '#11091c', border: '1px solid #2d1a42', padding: '15px', borderRadius: '8px', marginBottom: '20px', maxHeight: '320px', overflowY: 'auto' }}>
+            <div style={{ backgroundColor: '#11091c', border: '1px solid #2d1a42', padding: '15px', borderRadius: '8px', marginBottom: '20px', maxHeight: '300px', overflowY: 'auto' }}>
               <h3 style={{ marginTop: 0, color: '#ad82f7' }}>Subject Training Reports</h3>
-              {history.length === 0 ? <p style={{ color: '#666' }}>No entries logged yet.</p> : 
-                history.map(h => (
-                  <div key={h.id} style={{ padding: '8px 0', borderBottom: '1px solid #28153d' }}>
-                    <span style={{ color: '#fff' }}>⏳ {h.activity_type}</span>: <strong>{h.duration_minutes} mins</strong>
-                    <br/><small style={{ color: '#bfa3eb' }}>Metrics: {h.notes || 'None attached.'}</small>
-                  </div>
-                ))
-              }
+              {history.map(h => (
+                <div key={h.id} style={{ padding: '8px 0', borderBottom: '1px solid #28153d' }}>
+                  <span style={{ color: '#fff' }}>⏳ {h.activity_type}</span>: <strong>{h.duration_minutes} mins</strong>
+                  <br/><small style={{ color: '#bfa3eb' }}>Notes: {h.notes}</small>
+                </div>
+              ))}
             </div>
 
-            <div style={{ backgroundColor: '#11091c', border: '1px solid #2d1a42', padding: '15px', borderRadius: '8px', maxHeight: '320px', overflowY: 'auto' }}>
+            <div style={{ backgroundColor: '#11091c', border: '1px solid #2d1a42', padding: '15px', borderRadius: '8px', maxHeight: '300px', overflowY: 'auto' }}>
               <h3 style={{ marginTop: 0, color: '#e2a468' }}>Milestones Ledger</h3>
-              {milestones.length === 0 ? <p style={{ color: '#666' }}>No milestones recorded.</p> : 
-                milestones.map(m => (
-                  <div key={m.id} style={{ padding: '8px 0', borderBottom: '1px solid #28153d' }}>
-                    <span style={{ color: '#fff' }}>👑 {m.record_type}</span>
-                    <br/><small style={{ color: '#e2a468' }}>Details: {m.notes}</small>
-                  </div>
-                ))
-              }
+              {milestones.map(m => (
+                <div key={m.id} style={{ padding: '8px 0', borderBottom: '1px solid #28153d' }}>
+                  <span style={{ color: '#fff' }}>👑 {m.record_type}</span>
+                  <br/><small style={{ color: '#e2a468' }}>Details: {m.notes}</small>
+                </div>
+              ))}
             </div>
           </div>
         </div>
