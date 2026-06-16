@@ -1,19 +1,19 @@
 {
-  "short_name": "Realm Terminal",
-  "name": "Goddess Cindy's Realm Terminal",
+  "short_name": "Terminal",
+  "name": "Realm Terminal",
   "description": "Real-time communication and metrics vault tracking deck.",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Android_favicon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Android_favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
